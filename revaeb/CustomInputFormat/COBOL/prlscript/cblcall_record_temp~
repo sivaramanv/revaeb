@@ -1,0 +1,125 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. cblcall.
+
+ENVIRONMENT DIVISION.
+CONFIGURATION SECTION.
+SPECIAL-NAMES.
+ALPHABET ALPHA IS NATIVE
+ALPHABET  BETA IS EBCDIC.
+
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+SELECT SYSIN ASSIGN TO KEYBOARD
+ORGANIZATION IS SEQUENTIAL.
+
+SELECT LOGIT ASSIGN TO '/tmp/scalade-log'.
+
+DATA DIVISION.
+FILE SECTION.
+FD SYSIN.
+  01 STDIN-RECORD PIC X(___len___).
+
+FD LOGIT.
+  01 LOGIT-RECORD PIC X(___len___).
+
+WORKING-STORAGE SECTION.
+01 WS-TEXT.
+  05 WS-HEX-TEXT PIC X(___len___).
+  05 WS-HEX-TABLE REDEFINES WS-HEX-TEXT OCCURS ___lenby2___ TIMES.
+     10 WS-HEX-2BYTE   PIC X(2).
+  
+  05 WS-HEX-CONV.
+     10 WS-HEX-CNV-BYTE1  PIC X(1).
+     10 WS-HEX-CNV-BYTE2  PIC X(1).
+
+  05 WS-NUM-EQL           PIC S9(4) COMP.
+  05 WS-NUM-EQL-TXT REDEFINES WS-NUM-EQL.
+     10 FILLER            PIC X(1).
+     10 BIN-BYTE          PIC X(1).
+
+  05 WS-I PIC 9(4) VALUE 0.
+  05 I PIC S9(4) COMP.
+  05 T PIC S9(4) COMP.
+  05 WS-I2 PIC 9(4) COMP VALUE 1.
+  05 WS-EOF PIC X(01) VALUE 'N'.
+    88 END-OF-FILE VALUE 'Y'.
+
+01 WS-INPUT.
+___input_copybook___
+01 WS-OUTPUT.
+___output_copybook___
+
+PROCEDURE DIVISION.
+
+  OPEN INPUT SYSIN.
+  OPEN OUTPUT LOGIT.
+  PERFORM UNTIL END-OF-FILE
+    READ SYSIN
+      AT END
+         SET END-OF-FILE TO TRUE
+      NOT AT END
+
+	 PERFORM HEX-2-CHAR-CONV 
+	    THRU HEX-2-CHAR-CONV-EXIT
+
+         INSPECT ___INPUT_VARIABLE___ OF WS-INPUT CONVERTING BETA TO ALPHA
+
+         MOVE CORR WS-INPUT TO WS-OUTPUT
+
+         DISPLAY WS-OUTPUT
+
+         WRITE LOGIT-RECORD FROM WS-OUTPUT
+
+    END-READ
+  END-PERFORM
+  GOBACK.
+
+HEX-2-CHAR-CONV.
+
+         MOVE STDIN-RECORD    TO WS-HEX-TEXT
+
+         WRITE LOGIT-RECORD FROM WS-HEX-TEXT
+
+         PERFORM VARYING I FROM 1 BY 1 UNTIL I > ___lenby2___
+           MOVE WS-HEX-2BYTE(I)   TO  WS-HEX-CONV
+           EVALUATE WS-HEX-CNV-BYTE2
+               WHEN 'A'
+                  COMPUTE WS-NUM-EQL = 10
+               WHEN 'B' 
+                  COMPUTE WS-NUM-EQL = 11
+               WHEN 'C' 
+                  COMPUTE WS-NUM-EQL = 12
+               WHEN 'D'
+                  COMPUTE WS-NUM-EQL = 13
+               WHEN 'E'
+                  COMPUTE WS-NUM-EQL = 14
+               WHEN 'F'
+                  COMPUTE WS-NUM-EQL = 15
+               WHEN OTHER
+                  MOVE WS-HEX-CNV-BYTE2   TO WS-NUM-EQL
+           END-EVALUATE
+
+           EVALUATE WS-HEX-CNV-BYTE1
+               WHEN 'A'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (10 * 16)
+               WHEN 'B'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (11 * 16)
+               WHEN 'C'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (12 * 16)
+               WHEN 'D'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (13 * 16)
+               WHEN 'E'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (14 * 16)
+               WHEN 'F'
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (15 * 16)
+               WHEN OTHER
+                  MOVE WS-HEX-CNV-BYTE1 TO T
+                  COMPUTE WS-NUM-EQL = WS-NUM-EQL + (T * 16)
+           END-EVALUATE
+
+           MOVE BIN-BYTE                  TO WS-INPUT(I:1)
+
+         END-PERFORM
+
+HEX-2-CHAR-CONV-EXIT.
+EXIT.
